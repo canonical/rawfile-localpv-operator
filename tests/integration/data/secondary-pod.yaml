@@ -1,0 +1,34 @@
+# secondary-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: secondary-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: secondary-sc
+---
+# secondary-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: secondary-pod
+spec:
+  nodeSelector:
+    storagePool: secondary
+  containers:
+    - name: writer
+      image: busybox
+      command: ["/bin/sh", "-c"]
+      args:
+        - echo "Hello from secondary!" > /data/secondary.txt && sleep 3600
+      volumeMounts:
+        - name: data
+          mountPath: /data
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: secondary-pvc

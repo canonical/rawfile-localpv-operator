@@ -1,0 +1,5 @@
+ops ~= 2.17
+ops.manifest
+lightkube
+charms.contextual-status
+charms.reconciler
