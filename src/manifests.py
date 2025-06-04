@@ -18,9 +18,9 @@ from lightkube.resources.storage_v1 import StorageClass
 from ops.manifests import Addition, ManifestLabel, Manifests, Patch
 
 from literals import (
+    CREATE_NAMESPACE_CONFIG,
     DRIVER_FORMATTER_CONFIG,
     DRIVER_NAME,
-    MANAGED_NAMESPACE_CONFIG,
     NAMESPACE_CONFIG,
     NODE_SELECTOR_CONFIG,
     NODE_STORAGE_PATH_CONFIG,
@@ -287,7 +287,7 @@ class ManagedNamespace(Addition):
     def __call__(self) -> Union[None, AnyResource, Iterable[AnyResource]]:
         """Create a new namespace resource if the charm manages the namespace."""
         name = self.manifests.config.get(NAMESPACE_CONFIG)
-        managed = self.manifests.config.get(MANAGED_NAMESPACE_CONFIG)
+        managed = self.manifests.config.get(CREATE_NAMESPACE_CONFIG)
         if not name:
             log.info(
                 "Charm is managing namespace, but none was configured. Defaulting to 'default'"

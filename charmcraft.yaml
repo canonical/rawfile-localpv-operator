@@ -51,11 +51,14 @@ config:
           {name} - The original CSI driver name: 'rawfile.csi.openebs.io'
         Example: "{app}-{name}"
       default: "{app}-{name}"
-    manage-namespace:
+    create-namespace:
       type: boolean
       default: false
       description: |
-        Allow the charm to manage the configured namespace.
+        Allow the charm to create the configured namespace if it does not
+        exist.
+        Note: The charm does not manage the lifecycle of the namespace and
+          will not remove it if the charm is removed from the model.
     namespace:
       type: string
       default: default

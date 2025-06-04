@@ -14,7 +14,7 @@ from lightkube import ApiError, Client
 from lightkube.resources.core_v1 import Namespace
 from ops.manifests import Collector, ManifestClientError, ResourceAnalysis
 
-from literals import DEFAULT_NAMESPACE, MANAGED_NAMESPACE_CONFIG, NAMESPACE_CONFIG
+from literals import CREATE_NAMESPACE_CONFIG, DEFAULT_NAMESPACE, NAMESPACE_CONFIG
 from manifests import RawfileLocalPVManifests
 
 log = logging.getLogger(__name__)
@@ -49,19 +49,19 @@ class RawfileLocalPVOperatorCharm(ops.CharmBase):
         return str(self.config.get(NAMESPACE_CONFIG) or DEFAULT_NAMESPACE)
 
     def _purge_manifests(self) -> None:
-        status.add(ops.MaintenanceStatus("Removing Kubernetes Resources"))
-        for manifest in self.collector.manifests.values():
-            manifest.delete_manifests(ignore_unauthorized=True, ignore_not_found=True)
-
-    def _manage_manifests(self, event: ops.EventBase):
         if not self.unit.is_leader():
             return
 
-        if self._check_teardown(event):
-            self._purge_manifests()
+        status.add(ops.MaintenanceStatus("Removing Kubernetes Resources"))
+        for manifest in self.collector.manifests.values():
+            manifest.delete_manifests(ignore_unauthorized=True, ignore_not_found=True)
+        raise status.ReconcilerError("Removing charm, preventing reconcile.")
+
+    def _install_manifests(self):
+        if not self.unit.is_leader():
             return
 
-        self.unit.status = ops.MaintenanceStatus("Deploying Rawfile LocalPV")
+        status.add(ops.MaintenanceStatus("Deploying Rawfile LocalPV"))
         for manifest in self.collector.manifests.values():
             try:
                 manifest.apply_manifests()
@@ -79,7 +79,7 @@ class RawfileLocalPVOperatorCharm(ops.CharmBase):
         try:
             self._client.get(Namespace, name=namespace)
         except ApiError as e:
-            managed_ns = self.config.get(MANAGED_NAMESPACE_CONFIG)
+            managed_ns = self.config.get(CREATE_NAMESPACE_CONFIG)
             log.error(e)
             if e.status.code == 404 and managed_ns:
                 log.info(
@@ -88,9 +88,7 @@ class RawfileLocalPVOperatorCharm(ops.CharmBase):
                 )
                 return
             if e.status.code == 404 and not managed_ns:
-                log.warning(
-                    f"Namespace '{namespace}' not found and not managed by the charm."
-                )
+                log.warning(f"Namespace '{namespace}' not found and not managed by the charm.")
                 status.add(ops.BlockedStatus(f"Missing namespace '{namespace}'"))
                 raise status.ReconcilerError("Namespace not found")
 
@@ -143,9 +141,13 @@ class RawfileLocalPVOperatorCharm(ops.CharmBase):
 
     def reconcile(self, event):
         """Reconcile the charm state."""
+        if self._check_teardown(event):
+            self._purge_manifests()
+            return
+
         self._check_namespace()
         self._prevent_collisions(event)
-        self._manage_manifests(event)
+        self._install_manifests()
         self._update_status(event)
 
     def _scrub_resources(self, event: ops.ActionEvent) -> None:

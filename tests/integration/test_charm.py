@@ -1,15 +1,14 @@
-#!/usr/bin/env pythonstring3
+#!/usr/bin/env python3
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
 import logging
-import shlex
 from pathlib import Path
 
+import jubilant
 import pytest
 import yaml
 from kubernetes import client, config, utils
-from pytest_operator.plugin import OpsTest
 from utils import read_file_from_pod, wait_for_pod
 
 logger = logging.getLogger(__name__)
@@ -18,46 +17,37 @@ METADATA = yaml.safe_load(Path("charmcraft.yaml").read_text())
 APP_NAME = METADATA["name"]
 
 
-@pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest, request):
-    """Build and deploy the charm-under-test and related charms."""
-    charm_files = request.config.getoption("charm_files")
-    print("Charm files provided:", charm_files)
+@pytest.mark.usefixtures("kubernetes_cluster")
+def test_deploy_pools(juju: jubilant.Juju, charm_path: Path):
+    juju.deploy(
+        charm=charm_path,
+        app="primary-localpv",
+        config={
+            "namespace": "primary",
+            "storage-class-name": "primary-sc",
+            "node-selector": "storagePool=primary",
+            "create-namespace": True,
+        },
+    )
+    juju.deploy(
+        charm=charm_path,
+        app="secondary-localpv",
+        config={
+            "namespace": "secondary",
+            "storage-class-name": "secondary-sc",
+            "node-selector": "storagePool=secondary",
+            "create-namespace": True,
+        },
+    )
 
-    charm_file = next((Path(f) for f in charm_files if "24.04" in Path(f).name), None)
-    if charm_file:
-        charm = charm_file
-    else:
-        charm = next(Path(".").glob("rawfile-localpv*.charm"), None)
-        if not charm:
-            logger.info("Building rawfile-localpv charm.")
-            charms = await ops_test.build_charm(".", return_all=True)
-            charm = next((c for c in charms if "24.04" in c.name), None)
-            if not charm:
-                logger.error("Failed to build charm for 24.04.")
-                assert False, "Charm build failed for 24.04."
+    juju.integrate("k8s", "primary-localpv:kubernetes")
+    juju.integrate("k8s", "secondary-localpv:kubernetes")
 
-    overlays = [
-        ops_test.Bundle("canonical-kubernetes", channel="latest/edge"),
-        Path(__file__).parent / "overlay.yaml",
-    ]
-    context = {"charm": charm.resolve()}
-    bundle, *overlays = await ops_test.async_render_bundles(*overlays, **context)
-
-    logger.info("Deploying rawfile-localpv testing bundle.")
-    model = ops_test.model_full_name
-    cmd = f"juju deploy -m {model} {bundle} " + " ".join(f"--overlay={f}" for f in overlays)
-    rc, stdout, stderr = await ops_test.run(*shlex.split(cmd))
-    if rc != 0:
-        logger.error(f"Bundle deploy failed: {(stderr or stdout).strip()}")
-    assert rc == 0, f"Bundle deploy failed: {(stderr or stdout).strip()}"
-    logger.info(stdout)
-
-    await ops_test.model.wait_for_idle(status="active", timeout=60 * 60)
+    juju.wait(jubilant.all_active)
 
 
-async def test_multiple_providers(kubeconfig: Path, ops_test: OpsTest):
-    """Test multiple storage providers by deploying test pods and verifying output."""
+@pytest.mark.usefixtures("juju")
+def test_multiple_providers(kubeconfig: Path):
     config.load_kube_config(str(kubeconfig))
     api_client = client.ApiClient()
     core_v1 = client.CoreV1Api(api_client)
