@@ -1,9 +1,42 @@
+[project]
+name = "rawfile-localpv-operator"
+version = "0.0.0"
+description = "Charmed Operator for Rawfile LocalPV"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "charms.contextual-status",
+  "charms.reconciler",
+  "lightkube",
+  "ops",
+  "ops.manifest",
+  "pyyaml",
+]
+
+[dependency-groups]
+unit = [
+    "pytest",
+    "coverage[toml]",
+    "ops[testing]",
+]
+static = [
+    "pyright",
+    "ops[testing]",
+]
+integration = [
+    "pytest",
+    "jubilant~=1.0",
+    "kubernetes",
+]
 # Testing tools configuration
 [tool.coverage.run]
 branch = true
 
 [tool.coverage.report]
 show_missing = true
+
+[tool.mypy]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 minversion = "6.0"
@@ -35,7 +68,7 @@ lint.per-file-ignores = {"tests/*" = ["D100","D101","D102","D103","D104"]}
 max-complexity = 10
 
 [tool.codespell]
-skip = "build,lib,venv,icon.svg,.tox,.git,.mypy_cache,.ruff_cache,.coverage"
+skip = "build,lib,venv,icon.svg,.tox,.git,.mypy_cache,.ruff_cache,.coverage,upstream"
 
 [tool.pyright]
 include = ["src/**.py"]

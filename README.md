@@ -1,26 +1,18 @@
-<!--
-Avoid using this README file for information that is maintained or published elsewhere, e.g.:
+# Rawfile LocalPV Operator
 
-* metadata.yaml > published on Charmhub
-* documentation > published on (or linked to from) Charmhub
-* detailed contribution guide > documentation or CONTRIBUTING.md
+Charmhub package name: rawfile-localpv
+More information: [https://charmhub.io/rawfile-localpv](https://charmhub.io/rawfile-localpv)
 
-Use links instead.
--->
-
-# rawfile-operator
-
-Charmhub package name: operator-template
-More information: https://charmhub.io/rawfile-operator
-
-Describe your charm in one or two sentences.
+The **rawfile-localpv** charm simplifies the deployment and management of the
+Rawfile LocalPV storage provisioner on Canonical Kubernetes. With this charm,
+you can easily enable local storage provisioning for your workloads, leveraging
+raw files as persistent volumes.
 
 ## Other resources
 
-<!-- If your charm is documented somewhere else other than Charmhub, provide a link separately. -->
 
-- [Read more](https://example.com)
+- [Read more](https://github.com/openebs/rawfile-localpv)
 
-- [Contributing](CONTRIBUTING.md) <!-- or link to other contribution documentation -->
+- [Contributing](CONTRIBUTING.md)
 
 - See the [Juju SDK documentation](https://juju.is/docs/sdk) for more information about developing and improving charms.

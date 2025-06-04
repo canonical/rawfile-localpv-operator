@@ -1,0 +1,37 @@
+# Copyright 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+# primary-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: primary-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: primary-sc
+---
+# primary-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: primary-pod
+spec:
+  nodeSelector:
+    storagePool: primary
+  containers:
+    - name: writer
+      image: busybox
+      command: ["/bin/sh", "-c"]
+      args:
+        - echo "Hello from primary!" > /data/primary.txt && sleep 3600
+      volumeMounts:
+        - name: data
+          mountPath: /data
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: primary-pvc
