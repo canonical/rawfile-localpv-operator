@@ -1,55 +1,167 @@
-# This file configures Charmcraft.
-# See https://juju.is/docs/sdk/charmcraft-config for guidance.
-
-# (Required)
-name: rawfile-operator
-
-
-# (Required)
-type: charm
-
-
-# (Recommended)
-title: Charm Template
-
-
-# (Required)
-summary: A very short one-line summary of the charm.
-
-
-# (Required)
+name: rawfile-localpv
+title: Rawfile LocalPV
+summary: Subordinate charm for deploying CSI plugin for OpenEBS Rawfile LocalPV.
 description: |
-  A single sentence that says what the charm is, concisely and memorably.
+  This charm deploys a Container Storage Interface (CSI) plugin,
+  enabling a Canonical Kubernetes cluster to use rawfile-localpv
+  as a storage backend.
 
-  A paragraph of one to three short sentences, that describe what the charm does.
+type: charm
+subordinate: true
+parts:
+  charm:
+    plugin: charm
+  manifests:
+    plugin: dump
+    source: .
+    stage:
+      - upstream/**
 
-  A third paragraph that explains what need the charm meets.
+platforms:
+  ubuntu-22.04-amd64:
+    build-on:
+      - ubuntu@22.04:amd64
+    build-for:
+      - ubuntu@22.04:amd64
+  ubuntu-22.04-arm64:
+    build-on:
+      - ubuntu@22.04:arm64
+    build-for:
+      - ubuntu@22.04:arm64
 
-  Finally, a paragraph that describes whom the charm is useful for.
+  ubuntu-24.04-amd64:
+    build-on:
+      - ubuntu@24.04:amd64
+    build-for:
+      - ubuntu@24.04:amd64
+  ubuntu-24.04-arm64:
+    build-on:
+      - ubuntu@24.04:arm64
+    build-for:
+      - ubuntu@24.04:arm64
 
-
-# (Required for 'charm' type)
-bases:
-  - build-on:
-    - name: ubuntu
-      channel: "22.04"
-    run-on:
-    - name: ubuntu
-      channel: "22.04"
-
-
-# (Optional) Configuration options for the charm
-# This config section defines charm config options, and populates the Configure
-# tab on Charmhub.
-# More information on this section at https://juju.is/docs/sdk/charmcraft-yaml#heading--config
-# General configuration documentation: https://juju.is/docs/sdk/config
 config:
   options:
-    # An example config option to customise the log level of the workload
-    log-level:
-      description: |
-        Configures the log level of gunicorn.
-
-        Acceptable values are: "info", "debug", "warning", "error" and "critical"
-      default: "info"
+    csi-driver-formatter:
       type: string
+      description: |
+        Specifies a formatter for the CSI driver name. This should be unique
+        if deploying multiple instances. Valid placeholders:
+          {app}  - The Juju application name.
+          {name} - The original CSI driver name: 'rawfile.csi.openebs.io'
+        Example: "{app}-{name}"
+      default: "{app}-{name}"
+    manage-namespace:
+      type: boolean
+      default: false
+      description: |
+        Allow the charm to manage the configured namespace.
+    namespace:
+      type: string
+      default: default
+      description: |
+        The Kubernetes namespace in which to install rawfile-localpv resources,
+        including Deployments, DaemonSets, and other namespaced resources.
+
+        If unspecified, "default" is used.
+
+        NOTE: This can only be set at deployment time, as some Kubernetes
+        resource attributes are immutable after creation.
+    node-selector:
+      type: string
+      description: |
+        Specifies which nodes this operator targets for rawfile-localpv.
+        Declare node labels in key=value format, separated by spaces.
+        If no selector is set, a random node in the cluster may be
+        assigned.
+    node-storage-path:
+      type: string
+      default: "/var/csi/rawfile"
+      description: |
+        The path on each node where rawfile-localpv will store its data.
+    rbac-name-formatter:
+      type: string
+      description: |
+        Specifies a formatter for cluster-wide RBAC resource names.
+        Valid placeholders:
+          {app}  - The Juju application name.
+          {name} - The original resource name.
+        Example: "{app}-{name}"
+      default: "{app}-{name}"
+    storage-class-name:
+      type: string
+      description: |
+        The name of the StorageClass to create by default and assign to the
+        provider.
+    storage-class-reclaim-policy:
+      type: string
+      description: |
+        The reclaim policy to use for the StorageClass.
+    image-registry:
+      type: string
+      default: "ghcr.io/canonical"
+      description: |
+        Image registry for all rawfile-localpv CSI container images.
+
+        This value replaces the image registry in image URLs from the release
+        manifests. For example, an image URL like
+        `ghcr.io/canonical/rawfile-localpv:0.8.2` becomes
+        `myregistry.com/foo/rawfile-localpv:0.8.2` if set to
+        `myregistry.com/foo`.
+
+        Example:
+          juju config rawfile-localpv image-registry="myregistry.com/foo"
+    release:
+      type: string
+      default: "8.0.2"
+      description: |
+        The version of rawfile-localpv to deploy.
+
+        Example:
+          juju config rawfile-localpv release='8.0.2'
+
+        A list of supported versions is available via:
+          juju run rawfile-localpv/leader list-versions
+
+        To reset to the latest version supported by the charm:
+          juju config rawfile-localpv --reset release
+
+        The currently deployed release can be viewed with:
+          juju status rawfile-localpv
+
+actions:
+  list-versions:
+    description: List versions supported by this charm
+  list-resources:
+    description: List Resources of configured version
+    params:
+      resources:
+        type: string
+        default: ""
+        description: |
+          Space separated list of kubernetes resource types to filter list result
+  scrub-resources:
+    description: Remove deployments other than the current one
+    params:
+      resources:
+        type: string
+        default: ""
+        description: |
+          Space separated list of kubernetes resource types to filter scrubbing
+  sync-resources:
+    description: |
+      Add kubernetes resources which should be created by this charm which aren't
+      present within the cluster.
+    params:
+      resources:
+        type: string
+        default: ""
+        description: |
+          Space separated list of kubernetes resource types
+          to use a filter during the sync. This helps limit
+          which missing resources are applied.
+
+requires:
+  kubernetes:
+    interface: juju-info
+    scope: container
