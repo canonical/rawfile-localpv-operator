@@ -93,6 +93,8 @@ def charm_path(request: pytest.FixtureRequest) -> Path:
     charm_file = next((Path(f) for f in charm_files if base in Path(f).name), None)
     if not charm_file:
         pytest.fail(f"No charm file found for base '{base}'. Charm files provided: {charm_files}")
+
+    assert charm_file is not None
     return charm_file.resolve()
 
 

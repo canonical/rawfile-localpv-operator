@@ -389,6 +389,7 @@ dependencies = [
     { name = "lightkube" },
     { name = "ops" },
     { name = "ops-manifest" },
+    { name = "pyyaml" },
 ]
 
 [package.dev-dependencies]
@@ -405,6 +406,7 @@ requires-dist = [
     { name = "lightkube" },
     { name = "ops" },
     { name = "ops-manifest" },
+    { name = "pyyaml" },
 ]
 
 [package.metadata.requires-dev]

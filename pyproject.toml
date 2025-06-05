@@ -5,11 +5,12 @@ description = "Charmed Operator for Rawfile LocalPV"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-  "ops",
-  "ops.manifest",
-  "lightkube",
   "charms.contextual-status",
   "charms.reconciler",
+  "lightkube",
+  "ops",
+  "ops.manifest",
+  "pyyaml",
 ]
 
 [dependency-groups]
@@ -24,6 +25,9 @@ branch = true
 
 [tool.coverage.report]
 show_missing = true
+
+[tool.mypy]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 minversion = "6.0"
