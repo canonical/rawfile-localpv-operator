@@ -11,6 +11,7 @@ from typing import List, cast
 import ops
 from charms.reconciler import Reconciler, status
 from lightkube import ApiError, Client
+from lightkube.models.meta_v1 import ObjectMeta
 from lightkube.resources.core_v1 import Namespace
 from ops.manifests import Collector, ManifestClientError, ResourceAnalysis
 
@@ -71,6 +72,21 @@ class RawfileLocalPVOperatorCharm(ops.CharmBase):
                 log.warning("Encountered retriable installation error: %s", e)
                 raise status.ReconcilerError(failure_msg)
 
+    def _create_namespace(self) -> None:
+        """Create the configured namespace."""
+        namespace = self._configured_namespace
+        log.info(f"Ensuring namespace '{namespace}' exists")
+        ns_resource = Namespace(metadata=ObjectMeta(name=namespace))
+        try:
+            self._client.create(ns_resource)
+        except ApiError as e:
+            if e.status.code == 409:
+                log.info(f"Namespace '{namespace}' already exists")
+            else:
+                log.exception(f"Failed to create namespace '{namespace}'")
+                status.add(ops.WaitingStatus(f"Waiting to create namespace: {namespace}"))
+                raise status.ReconcilerError(f"Failed to create namespace '{namespace}'")
+
     def _check_namespace(self) -> None:
         """Check if the configured namespace exists in the Kubernetes cluster."""
         self.unit.status = ops.MaintenanceStatus("Evaluating Namespace")
@@ -86,6 +102,7 @@ class RawfileLocalPVOperatorCharm(ops.CharmBase):
                     f"Namespace '{namespace}' not found, but manage-namespace=True"
                     "Assuming it will be managed by the charm."
                 )
+                self._create_namespace()
                 return
             if e.status.code == 404 and not managed_ns:
                 log.warning(f"Namespace '{namespace}' not found and not managed by the charm.")

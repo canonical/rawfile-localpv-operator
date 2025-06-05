@@ -5,20 +5,17 @@
 
 import logging
 from functools import cached_property
-from typing import Dict, Iterable, Optional, Protocol, Union
+from typing import Dict, Optional, Protocol
 
 from lightkube.codecs import AnyResource
 from lightkube.core.resource import NamespacedResource
 from lightkube.models.apps_v1 import StatefulSet
-from lightkube.models.meta_v1 import ObjectMeta
 from lightkube.models.rbac_v1 import ClusterRole, ClusterRoleBinding, RoleBinding
 from lightkube.resources.apps_v1 import DaemonSet
-from lightkube.resources.core_v1 import Namespace
 from lightkube.resources.storage_v1 import StorageClass
-from ops.manifests import Addition, ManifestLabel, Manifests, Patch
+from ops.manifests import ConfigRegistry, ManifestLabel, Manifests, Patch
 
 from literals import (
-    CREATE_NAMESPACE_CONFIG,
     DRIVER_FORMATTER_CONFIG,
     DRIVER_NAME,
     NAMESPACE_CONFIG,
@@ -281,37 +278,19 @@ class RBACAdjustments(Patch):
                 obj.roleRef.name = self._rename(obj.roleRef.name)
 
 
-class ManagedNamespace(Addition):
-    """Addition class to manage the configured namespace."""
-
-    def __call__(self) -> Union[None, AnyResource, Iterable[AnyResource]]:
-        """Create a new namespace resource if the charm manages the namespace."""
-        name = self.manifests.config.get(NAMESPACE_CONFIG)
-        managed = self.manifests.config.get(CREATE_NAMESPACE_CONFIG)
-        if not name:
-            log.info(
-                "Charm is managing namespace, but none was configured. Defaulting to 'default'"
-            )
-            return None
-        if not managed:
-            log.info("Namespace is not managed, not adding to the managed manifests.")
-            return None
-        return Namespace(metadata=ObjectMeta(name=name))  # pyright: ignore[reportReturnType]
-
-
 class RawfileLocalPVManifests(Manifests):
     """Class for managing rawfile-localpv resources."""
 
     def __init__(self, charm):
         manipulations = [
-            ManagedNamespace(self),
-            ManifestLabel(self),
             AdjustNamespace(self),
-            RBACAdjustments(self),
+            ConfigRegistry(self),
+            ConfigureStorageClass(self),
             CSIDriverAdjustments(self),
             DaemonSetAdjustments(self),
+            ManifestLabel(self),
+            RBACAdjustments(self),
             UpdateCSIDriverName(self),
-            ConfigureStorageClass(self),
         ]
 
         super().__init__("rawfile-local-pv", charm.model, "upstream", manipulations)
