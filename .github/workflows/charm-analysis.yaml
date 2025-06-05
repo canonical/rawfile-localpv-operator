@@ -16,5 +16,5 @@ jobs:
         - '3.12'
     with:
       self-hosted-runner:  false
-      with-uv: false
+      with-uv: true
       python-version: ${{ matrix.python-version }}

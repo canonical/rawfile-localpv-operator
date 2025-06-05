@@ -13,7 +13,12 @@ type: charm
 subordinate: true
 parts:
   charm:
-    plugin: charm
+    source: .
+    plugin: uv
+    build-snaps:
+      - astral-uv
+    override-build: |
+      craftctl default
   manifests:
     plugin: dump
     source: .

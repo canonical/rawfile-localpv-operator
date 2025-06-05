@@ -95,16 +95,16 @@ class RawfileLocalPVOperatorCharm(ops.CharmBase):
         try:
             self._client.get(Namespace, name=namespace)
         except ApiError as e:
-            managed_ns = self.config.get(CREATE_NAMESPACE_CONFIG)
+            create_ns = self.config.get(CREATE_NAMESPACE_CONFIG)
             log.error(e)
-            if e.status.code == 404 and managed_ns:
+            if e.status.code == 404 and create_ns:
                 log.info(
-                    f"Namespace '{namespace}' not found, but manage-namespace=True"
+                    f"Namespace '{namespace}' not found, but create-namespace=True"
                     "Assuming it will be managed by the charm."
                 )
                 self._create_namespace()
                 return
-            if e.status.code == 404 and not managed_ns:
+            if e.status.code == 404 and not create_ns:
                 log.warning(f"Namespace '{namespace}' not found and not managed by the charm.")
                 status.add(ops.BlockedStatus(f"Missing namespace '{namespace}'"))
                 raise status.ReconcilerError("Namespace not found")
