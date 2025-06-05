@@ -14,13 +14,6 @@ jobs:
         run: echo "channel=$(cat .charmcraft-channel)" >> $GITHUB_OUTPUT
 
   integration-tests:
-    steps:
-      - name: Setup Astral UV
-        uses: astral-sh/setup-uv@v5
-        with:
-          python-version: 3.10
-      - name: Install tox with UV
-        run: uv tool install tox --with tox-uv
     uses: canonical/operator-workflows/.github/workflows/integration_test.yaml@main
     needs: [charmcraft-channel]
     secrets: inherit
