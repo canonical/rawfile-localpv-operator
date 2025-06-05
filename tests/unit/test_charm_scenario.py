@@ -45,7 +45,7 @@ def test_blocks_when_missing_ns_not_managed(mock_client):
 
     ns = "my-namespace"
     ctx = testing.Context(RawfileLocalPVOperatorCharm)
-    state = testing.State(config={"create-namespace": False, "namespace": ns})
+    state = testing.State(leader=True, config={"create-namespace": False, "namespace": ns})
     out = ctx.run(ctx.on.config_changed(), state)
     assert out.unit_status == testing.BlockedStatus(f"Missing namespace '{ns}'")
 

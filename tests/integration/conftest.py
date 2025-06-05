@@ -24,11 +24,12 @@ def pytest_addoption(parser: pytest.Parser):
     """Parse additional pytest options.
 
     --charm-file
-        Can be used multiple times, specifies which local charm files are available.
-        Expected filename format: {charmName}_{base}-{arch}.charm
-        Example: k8s-worker_ubuntu-22.04-amd64_ubuntu-24.04-amd64.charm
-        Some tests use subordinate charms (e.g. Ceph) that expect the charm
-        base to match.
+        This option can be used multiple times to specify local charm files
+        that should be made available. The expected filename format is:
+        `{charmName}_{base}-{arch}.charm`.
+        For example: `rawfile-localpv_ubuntu-22.04-amd64.charm`
+        Since Rawfile LocalPV is a subordinate charm, its base is expected
+        to match the base of the Kubernetes charms it works with.
 
     --base
         Specifies which Ubuntu base to test against.
@@ -43,11 +44,12 @@ def pytest_addoption(parser: pytest.Parser):
         action="append",
         default=[],
         help=(
-            "Can be used multiple times, specifies which local charm files are available. "
-            r"Expected filename format: {charmName}_{base}-{arch}.charm. "
-            "Example: k8s-worker_ubuntu-22.04-amd64_ubuntu-24.04-amd64.charm. "
-            "Some tests use subordinate charms (e.g. Ceph) that expect the charm "
-            "base to match."
+            "This option can be used multiple times to specify local charm files"
+            "that should be made available. The expected filename format is:"
+            r"`{charmName}_{base}-{arch}.charm`."
+            "For example: `rawfile-localpv_ubuntu-22.04-amd64.charm`"
+            "Since Rawfile LocalPV is a subordinate charm, its base is expected"
+            "to match the base of the Kubernetes charms it works with."
         ),
     )
     parser.addoption(

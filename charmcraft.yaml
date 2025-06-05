@@ -17,8 +17,6 @@ parts:
     plugin: uv
     build-snaps:
       - astral-uv
-    override-build: |
-      craftctl default
   manifests:
     plugin: dump
     source: .

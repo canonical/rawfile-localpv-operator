@@ -59,9 +59,6 @@ class RawfileLocalPVOperatorCharm(ops.CharmBase):
         raise status.ReconcilerError("Removing charm, preventing reconcile.")
 
     def _install_manifests(self):
-        if not self.unit.is_leader():
-            return
-
         status.add(ops.MaintenanceStatus("Deploying Rawfile LocalPV"))
         for manifest in self.collector.manifests.values():
             try:
@@ -130,9 +127,6 @@ class RawfileLocalPVOperatorCharm(ops.CharmBase):
         self.collector.list_resources(event, "", resources)
 
     def _prevent_collisions(self, event: ops.EventBase) -> None:
-        if not self.unit.is_leader():
-            return
-
         status.add(ops.MaintenanceStatus("Detecting resource collisions"))
         analyses: List[ResourceAnalysis] = self.collector.analyze_resources(
             event=event, manifests=None, resources=None
@@ -162,9 +156,10 @@ class RawfileLocalPVOperatorCharm(ops.CharmBase):
             self._purge_manifests()
             return
 
-        self._check_namespace()
-        self._prevent_collisions(event)
-        self._install_manifests()
+        if self.unit.is_leader():
+            self._check_namespace()
+            self._prevent_collisions(event)
+            self._install_manifests()
         self._update_status(event)
 
     def _scrub_resources(self, event: ops.ActionEvent) -> None:

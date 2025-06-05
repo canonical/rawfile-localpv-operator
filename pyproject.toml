@@ -19,6 +19,10 @@ unit = [
     "coverage[toml]",
     "ops[testing]",
 ]
+static = [
+    "pyright",
+    "ops[testing]",
+]
 # Testing tools configuration
 [tool.coverage.run]
 branch = true
