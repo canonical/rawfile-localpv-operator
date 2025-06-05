@@ -14,7 +14,7 @@ metadata:
   name: csi-rawfile
   annotations:
     storageclass.kubernetes.io/is-default-class: "false"
-provisioner: rawfile-dummy.csi.openebs.io
+provisioner: rawfile.csi.openebs.io
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
 allowVolumeExpansion: true
@@ -186,15 +186,12 @@ metadata:
   labels:
     helm.sh/chart: rawfile-csi-0.9.1
     app.kubernetes.io/name: rawfile-csi
-    
     app.kubernetes.io/version: "0.8.2"
-    app.kubernetes.io/managed-by: Helm
     component: controller
 spec:
   type: ClusterIP
   selector:
     app.kubernetes.io/name: rawfile-csi
-    
     component: controller
   clusterIP: None
 ---
@@ -206,9 +203,7 @@ metadata:
   labels:
     helm.sh/chart: rawfile-csi-0.9.1
     app.kubernetes.io/name: rawfile-csi
-    
     app.kubernetes.io/version: "0.8.2"
-    app.kubernetes.io/managed-by: Helm
     component: node
 spec:
   type: ClusterIP
@@ -219,7 +214,6 @@ spec:
       protocol: TCP
   selector:
     app.kubernetes.io/name: rawfile-csi
-    
     component: node
 ---
 # Source: rawfile-csi/templates/01-node-plugin.yaml
@@ -234,7 +228,6 @@ spec:
   selector:
     matchLabels: &selectorLabels
       app.kubernetes.io/name: rawfile-csi
-      
       component: node
   template:
     metadata:
@@ -271,7 +264,7 @@ spec:
             privileged: true
           env:
             - name: PROVISIONER_NAME
-              value: "rawfile-dummy.csi.openebs.io"
+              value: "rawfile.csi.openebs.io"
             - name: CSI_ENDPOINT
               value: unix:///csi/csi.sock
             - name: IMAGE_REPOSITORY
@@ -423,7 +416,7 @@ spec:
           - --disable-metrics
           env:
             - name: PROVISIONER_NAME
-              value: "rawfile-dummy.csi.openebs.io"
+              value: "rawfile.csi.openebs.io"
             - name: CSI_ENDPOINT
               value: unix:///csi/csi.sock
             - name: IMAGE_REPOSITORY
