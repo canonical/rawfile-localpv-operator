@@ -23,6 +23,11 @@ static = [
     "pyright",
     "ops[testing]",
 ]
+integration = [
+    "pytest",
+    "jubilant~=1.0",
+    "kubernetes",
+]
 # Testing tools configuration
 [tool.coverage.run]
 branch = true
