@@ -106,27 +106,14 @@ config:
       type: string
       description: |
         The reclaim policy to use for the StorageClass.
-    image-registry:
-      type: string
-      description: |
-        Image registry for all rawfile-localpv CSI container images.
-
-        This value replaces the image registry in image URLs from the release
-        manifests. For example, an image URL like
-        `ghcr.io/canonical/rawfile-localpv:0.8.2` becomes
-        `myregistry.com/canonical/rawfile-localpv:0.8.2` if set to
-        `myregistry.com`.
-
-        Example:
-          juju config rawfile-localpv image-registry="myregistry.com"
     release:
       type: string
-      default: "8.0.2"
+      default: "0.8.2"
       description: |
         The version of rawfile-localpv to deploy.
 
         Example:
-          juju config rawfile-localpv release='8.0.2'
+          juju config rawfile-localpv release='0.8.2'
 
         A list of supported versions is available via:
           juju run rawfile-localpv/leader list-versions
