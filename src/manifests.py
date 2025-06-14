@@ -284,7 +284,6 @@ class RawfileLocalPVManifests(Manifests):
     def __init__(self, charm):
         manipulations = [
             AdjustNamespace(self),
-            ConfigRegistry(self),
             ConfigureStorageClass(self),
             CSIDriverAdjustments(self),
             DaemonSetAdjustments(self),
