@@ -28,6 +28,10 @@ integration = [
     "jubilant~=1.0",
     "kubernetes",
 ]
+
+manifests =[
+  "packaging"
+]
 # Testing tools configuration
 [tool.coverage.run]
 branch = true
