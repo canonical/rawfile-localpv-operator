@@ -589,6 +589,9 @@ integration = [
     { name = "kubernetes" },
     { name = "pytest" },
 ]
+manifests = [
+    { name = "packaging" },
+]
 static = [
     { name = "ops", extra = ["testing"] },
     { name = "pyright" },
@@ -615,6 +618,7 @@ integration = [
     { name = "kubernetes" },
     { name = "pytest" },
 ]
+manifests = [{ name = "packaging" }]
 static = [
     { name = "ops", extras = ["testing"] },
     { name = "pyright" },
