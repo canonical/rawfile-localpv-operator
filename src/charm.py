@@ -11,6 +11,7 @@ from typing import List, cast
 import ops
 from charms.reconciler import Reconciler, status
 from lightkube import ApiError, Client
+from lightkube.core.exceptions import ConfigError
 from lightkube.models.meta_v1 import ObjectMeta
 from lightkube.resources.core_v1 import Namespace
 from ops.manifests import Collector, ManifestClientError, ResourceAnalysis
@@ -108,6 +109,10 @@ class RawfileLocalPVOperatorCharm(ops.CharmBase):
 
             status.add(ops.WaitingStatus("Waiting for Kubernetes API"))
             raise status.ReconcilerError("Waiting for Kubernetes API")
+        except ConfigError:
+            msg = "Waiting for Kubeconfig"
+            status.add(ops.WaitingStatus(msg))
+            raise status.ReconcilerError(msg)
 
     def _check_teardown(self, event: ops.EventBase) -> bool:
         """Check if the charm is terminating."""
