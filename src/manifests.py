@@ -13,7 +13,7 @@ from lightkube.models.apps_v1 import StatefulSet
 from lightkube.models.rbac_v1 import ClusterRole, ClusterRoleBinding, RoleBinding
 from lightkube.resources.apps_v1 import DaemonSet
 from lightkube.resources.storage_v1 import StorageClass
-from ops.manifests import ConfigRegistry, ManifestLabel, Manifests, Patch
+from ops.manifests import ManifestLabel, Manifests, Patch
 
 from literals import (
     DRIVER_FORMATTER_CONFIG,
