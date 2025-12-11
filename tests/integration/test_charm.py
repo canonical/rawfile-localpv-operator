@@ -211,48 +211,50 @@ class TestVolumeLifecycle:
         pod_name = "test-delete-policy-pod"
         namespace = DEFAULT_NAMESPACE
 
-        with utils.managed_storage_class(
-            storage_api,
-            name=sc_name,
-            provisioner=self.csi_provisioner,
-            reclaim_policy="Delete",
-        ):
-            with utils.managed_pvc(
+        with (
+            utils.managed_storage_class(
+                storage_api,
+                name=sc_name,
+                provisioner=self.csi_provisioner,
+                reclaim_policy="Delete",
+            ),
+            utils.managed_pvc(
                 core_v1,
                 name=pvc_name,
                 namespace=namespace,
                 storage_class=sc_name,
                 size="1Gi",
-            ):
-                with utils.managed_pod(
-                    core_v1,
-                    pod_name=pod_name,
-                    pvc_name=pvc_name,
-                    namespace=namespace,
-                    node_selector={"storagePool": "primary"},
-                ):
-                    utils.wait_for_pvc_bound(
-                        core_v1, pvc_name, namespace, timeout=utils.PVC_WAIT_TIMEOUT
-                    )
+            ),
+            utils.managed_pod(
+                core_v1,
+                pod_name=pod_name,
+                pvc_name=pvc_name,
+                namespace=namespace,
+                node_selector={"storagePool": "primary"},
+            ),
+        ):
+            utils.wait_for_pvc_bound(
+                core_v1, pvc_name, namespace, timeout=utils.PVC_WAIT_TIMEOUT
+            )
 
-                    pv_name = utils.get_pv_for_pvc(core_v1, pvc_name, namespace)
-                    assert pv_name is not None, f"PVC '{pvc_name}' is not bound to any PV"
+            pv_name = utils.get_pv_for_pvc(core_v1, pvc_name, namespace)
+            assert pv_name is not None, f"PVC '{pvc_name}' is not bound to any PV"
 
-                    reclaim_policy = utils.get_pv_reclaim_policy(core_v1, pv_name)
-                    assert reclaim_policy == "Delete", (
-                        f"Expected reclaim policy 'Delete' but got '{reclaim_policy}'"
-                    )
+            reclaim_policy = utils.get_pv_reclaim_policy(core_v1, pv_name)
+            assert reclaim_policy == "Delete", (
+                f"Expected reclaim policy 'Delete' but got '{reclaim_policy}'"
+            )
 
-                # Pod is deleted when exiting managed_pod context
-                utils.wait_for_pod_deleted(core_v1, pod_name, namespace)
+        # Pod is deleted when exiting managed_pod context
+        utils.wait_for_pod_deleted(core_v1, pod_name, namespace)
 
-            # PVC is deleted when exiting managed_pvc context
-            utils.wait_for_pvc_deleted(core_v1, pvc_name, namespace)
+        # PVC is deleted when exiting managed_pvc context
+        utils.wait_for_pvc_deleted(core_v1, pvc_name, namespace)
 
-            # Verify PV is deleted
-            utils.wait_for_pv_deleted(core_v1, pv_name, timeout=utils.PVC_WAIT_TIMEOUT)
+        # Verify PV is deleted
+        utils.wait_for_pv_deleted(core_v1, pv_name, timeout=utils.PVC_WAIT_TIMEOUT)
 
-            logger.info("Successfully verified: PV '%s' was deleted after PVC deletion", pv_name)
+        logger.info("Successfully verified: PV '%s' was deleted after PVC deletion", pv_name)
 
     def test_volume_retain_policy(self, kubeconfig: Path):
         """Test that PV is retained when PVC is deleted with 'Retain' reclaim policy."""
@@ -266,60 +268,62 @@ class TestVolumeLifecycle:
         namespace = DEFAULT_NAMESPACE
         pv_name = None
 
-        with utils.managed_storage_class(
-            storage_api,
-            name=sc_name,
-            provisioner=self.csi_provisioner,
-            reclaim_policy="Retain",
-        ):
-            with utils.managed_pvc(
+        with (
+            utils.managed_storage_class(
+                storage_api,
+                name=sc_name,
+                provisioner=self.csi_provisioner,
+                reclaim_policy="Retain",
+            ),
+            utils.managed_pvc(
                 core_v1,
                 name=pvc_name,
                 namespace=namespace,
                 storage_class=sc_name,
                 size="1Gi",
-            ):
-                with utils.managed_pod(
-                    core_v1,
-                    pod_name=pod_name,
-                    pvc_name=pvc_name,
-                    namespace=namespace,
-                    node_selector={"storagePool": "primary"},
-                ):
-                    utils.wait_for_pvc_bound(
-                        core_v1, pvc_name, namespace, timeout=utils.PVC_WAIT_TIMEOUT
-                    )
-
-                    pv_name = utils.get_pv_for_pvc(core_v1, pvc_name, namespace)
-                    assert pv_name is not None, f"PVC '{pvc_name}' is not bound to any PV"
-
-                    reclaim_policy = utils.get_pv_reclaim_policy(core_v1, pv_name)
-                    assert reclaim_policy == "Retain", (
-                        f"Expected reclaim policy 'Retain' but got '{reclaim_policy}'"
-                    )
-
-                # Pod is deleted when exiting managed_pod context
-                utils.wait_for_pod_deleted(core_v1, pod_name, namespace)
-
-            # PVC is deleted when exiting managed_pvc context
-            utils.wait_for_pvc_deleted(core_v1, pvc_name, namespace)
-
-            # Verify PV is retained (not deleted)
-            assert utils.pv_exists(core_v1, pv_name), (
-                f"PV '{pv_name}' was deleted but should have been retained"
+            ),
+            utils.managed_pod(
+                core_v1,
+                pod_name=pod_name,
+                pvc_name=pvc_name,
+                namespace=namespace,
+                node_selector={"storagePool": "primary"},
+            ),
+        ):
+            utils.wait_for_pvc_bound(
+                core_v1, pvc_name, namespace, timeout=utils.PVC_WAIT_TIMEOUT
             )
 
-            pv = core_v1.read_persistent_volume(pv_name)
-            assert pv.status.phase == "Released", (
-                f"Expected PV status 'Released' but got '{pv.status.phase}'"
+            pv_name = utils.get_pv_for_pvc(core_v1, pvc_name, namespace)
+            assert pv_name is not None, f"PVC '{pvc_name}' is not bound to any PV"
+
+            reclaim_policy = utils.get_pv_reclaim_policy(core_v1, pv_name)
+            assert reclaim_policy == "Retain", (
+                f"Expected reclaim policy 'Retain' but got '{reclaim_policy}'"
             )
 
-            logger.info(
-                "Successfully verified: PV '%s' was retained after PVC deletion with status '%s'",
-                pv_name,
-                pv.status.phase,
-            )
+        # Pod is deleted when exiting managed_pod context
+        utils.wait_for_pod_deleted(core_v1, pod_name, namespace)
 
-            # Clean up the retained PV using managed_pv context
-            with utils.managed_pv(core_v1, pv_name):
-                logger.info("Cleaning up retained PV '%s'", pv_name)
+        # PVC is deleted when exiting managed_pvc context
+        utils.wait_for_pvc_deleted(core_v1, pvc_name, namespace)
+
+        # Verify PV is retained (not deleted)
+        assert utils.pv_exists(core_v1, pv_name), (
+            f"PV '{pv_name}' was deleted but should have been retained"
+        )
+
+        pv = core_v1.read_persistent_volume(pv_name)
+        assert pv.status.phase == "Released", (
+            f"Expected PV status 'Released' but got '{pv.status.phase}'"
+        )
+
+        logger.info(
+            "Successfully verified: PV '%s' was retained after PVC deletion with status '%s'",
+            pv_name,
+            pv.status.phase,
+        )
+
+        # Clean up the retained PV using managed_pv context
+        with utils.managed_pv(core_v1, pv_name):
+            logger.info("Cleaning up retained PV '%s'", pv_name)
