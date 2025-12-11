@@ -27,6 +27,7 @@ integration = [
     "pytest",
     "jubilant~=1.0",
     "kubernetes",
+    "tenacity",
 ]
 
 manifests =[

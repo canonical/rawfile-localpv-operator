@@ -17,35 +17,20 @@ from typing import List
 
 import jubilant
 import pytest
+import utils
 import yaml
-from kubernetes import client, config, utils
-from utils import (
-    POD_WAIT_TIMEOUT,
-    PVC_WAIT_TIMEOUT,
-    create_pod_with_pvc,
-    create_pvc,
-    create_storage_class,
-    delete_pod,
-    delete_pv,
-    delete_pvc,
-    delete_storage_class,
-    get_pv_for_pvc,
-    get_pv_reclaim_policy,
-    k8s_resource_cleanup,
-    pv_exists,
-    read_file_from_pod,
-    verify_storage_class_exists,
-    wait_for_pod,
-    wait_for_pod_deleted,
-    wait_for_pv_deleted,
-    wait_for_pvc_bound,
-    wait_for_pvc_deleted,
-)
+from kubernetes import client, config
+from kubernetes import utils as k8s_utils
 
 logger = logging.getLogger(__name__)
 
 METADATA = yaml.safe_load(Path("charmcraft.yaml").read_text())
 APP_NAME = METADATA["name"]
+
+# Namespace constants
+PRIMARY_NAMESPACE = "primary"
+SECONDARY_NAMESPACE = "secondary"
+DEFAULT_NAMESPACE = "default"
 
 # Test resource names for cleanup tracking
 PRIMARY_RESOURCES = [
@@ -75,7 +60,7 @@ class TestDeployment:
             charm=charm_path,
             app="primary-localpv",
             config={
-                "namespace": "primary",
+                "namespace": PRIMARY_NAMESPACE,
                 "storage-class-name": "primary-sc",
                 "node-selector": "storagePool=primary",
                 "create-namespace": True,
@@ -85,7 +70,7 @@ class TestDeployment:
             charm=charm_path,
             app="secondary-localpv",
             config={
-                "namespace": "secondary",
+                "namespace": SECONDARY_NAMESPACE,
                 "storage-class-name": "secondary-sc",
                 "node-selector": "storagePool=secondary",
                 "create-namespace": True,
@@ -106,10 +91,10 @@ class TestDeployment:
         config.load_kube_config(str(kubeconfig))
         storage_api = client.StorageV1Api()
 
-        assert verify_storage_class_exists(storage_api, "primary-sc"), (
+        assert utils.verify_storage_class_exists(storage_api, "primary-sc"), (
             "Primary storage class 'primary-sc' was not created"
         )
-        assert verify_storage_class_exists(storage_api, "secondary-sc"), (
+        assert utils.verify_storage_class_exists(storage_api, "secondary-sc"), (
             "Secondary storage class 'secondary-sc' was not created"
         )
 
@@ -152,11 +137,11 @@ class TestStorageProvisioning:
 
         all_resources = PRIMARY_RESOURCES + SECONDARY_RESOURCES
 
-        with k8s_resource_cleanup(api_client, all_resources, namespace="default"):
+        with utils.k8s_resource_cleanup(api_client, all_resources, namespace=DEFAULT_NAMESPACE):
             # Create all resources from manifests
             for manifest_file in [primary_manifests, secondary_manifest]:
                 for manifest in self._load_manifests(manifest_file):
-                    utils.create_from_dict(api_client, manifest)
+                    k8s_utils.create_from_dict(api_client, manifest)
                     logger.info(
                         "Created %s '%s'",
                         manifest.get("kind"),
@@ -164,35 +149,39 @@ class TestStorageProvisioning:
                     )
 
             # Wait for PVCs to be bound first (ensures storage provisioning works)
-            wait_for_pvc_bound(core_v1, "primary-pvc", "default", timeout=PVC_WAIT_TIMEOUT)
-            wait_for_pvc_bound(core_v1, "secondary-pvc", "default", timeout=PVC_WAIT_TIMEOUT)
+            utils.wait_for_pvc_bound(
+                core_v1, "primary-pvc", DEFAULT_NAMESPACE, timeout=utils.PVC_WAIT_TIMEOUT
+            )
+            utils.wait_for_pvc_bound(
+                core_v1, "secondary-pvc", DEFAULT_NAMESPACE, timeout=utils.PVC_WAIT_TIMEOUT
+            )
 
             # Wait for pods to be running
-            wait_for_pod(
+            utils.wait_for_pod(
                 core_v1,
                 "primary-pod",
-                "default",
+                DEFAULT_NAMESPACE,
                 target_state="Running",
-                timeout=POD_WAIT_TIMEOUT,
+                timeout=utils.POD_WAIT_TIMEOUT,
             )
-            wait_for_pod(
+            utils.wait_for_pod(
                 core_v1,
                 "secondary-pod",
-                "default",
+                DEFAULT_NAMESPACE,
                 target_state="Running",
-                timeout=POD_WAIT_TIMEOUT,
+                timeout=utils.POD_WAIT_TIMEOUT,
             )
 
             # Verify data was written correctly to each storage pool
-            primary_content = read_file_from_pod(
-                core_v1, "primary-pod", "/data/primary.txt", namespace="default"
+            primary_content = utils.read_file_from_pod(
+                core_v1, "primary-pod", "/data/primary.txt", namespace=DEFAULT_NAMESPACE
             )
             assert primary_content == "Hello from primary!", (
                 f"Expected 'Hello from primary!' but got '{primary_content}'"
             )
 
-            secondary_content = read_file_from_pod(
-                core_v1, "secondary-pod", "/data/secondary.txt", namespace="default"
+            secondary_content = utils.read_file_from_pod(
+                core_v1, "secondary-pod", "/data/secondary.txt", namespace=DEFAULT_NAMESPACE
             )
             assert secondary_content == "Hello from secondary!", (
                 f"Expected 'Hello from secondary!' but got '{secondary_content}'"
@@ -220,66 +209,50 @@ class TestVolumeLifecycle:
         sc_name = "test-delete-policy-sc"
         pvc_name = "test-delete-policy-pvc"
         pod_name = "test-delete-policy-pod"
-        namespace = "default"
+        namespace = DEFAULT_NAMESPACE
 
-        try:
-            create_storage_class(
-                storage_api,
-                name=sc_name,
-                provisioner=self.csi_provisioner,
-                reclaim_policy="Delete",
-            )
-
-            create_pvc(
+        with utils.managed_storage_class(
+            storage_api,
+            name=sc_name,
+            provisioner=self.csi_provisioner,
+            reclaim_policy="Delete",
+        ):
+            with utils.managed_pvc(
                 core_v1,
                 name=pvc_name,
                 namespace=namespace,
                 storage_class=sc_name,
                 size="1Gi",
-            )
+            ):
+                with utils.managed_pod(
+                    core_v1,
+                    pod_name=pod_name,
+                    pvc_name=pvc_name,
+                    namespace=namespace,
+                    node_selector={"storagePool": "primary"},
+                ):
+                    utils.wait_for_pvc_bound(
+                        core_v1, pvc_name, namespace, timeout=utils.PVC_WAIT_TIMEOUT
+                    )
 
-            create_pod_with_pvc(
-                core_v1,
-                pod_name=pod_name,
-                pvc_name=pvc_name,
-                namespace=namespace,
-                node_selector={"storagePool": "primary"},
-            )
+                    pv_name = utils.get_pv_for_pvc(core_v1, pvc_name, namespace)
+                    assert pv_name is not None, f"PVC '{pvc_name}' is not bound to any PV"
 
-            wait_for_pvc_bound(core_v1, pvc_name, namespace, timeout=PVC_WAIT_TIMEOUT)
+                    reclaim_policy = utils.get_pv_reclaim_policy(core_v1, pv_name)
+                    assert reclaim_policy == "Delete", (
+                        f"Expected reclaim policy 'Delete' but got '{reclaim_policy}'"
+                    )
 
-            pv_name = get_pv_for_pvc(core_v1, pvc_name, namespace)
-            assert pv_name is not None, f"PVC '{pvc_name}' is not bound to any PV"
+                # Pod is deleted when exiting managed_pod context
+                utils.wait_for_pod_deleted(core_v1, pod_name, namespace)
 
-            reclaim_policy = get_pv_reclaim_policy(core_v1, pv_name)
-            assert reclaim_policy == "Delete", (
-                f"Expected reclaim policy 'Delete' but got '{reclaim_policy}'"
-            )
+            # PVC is deleted when exiting managed_pvc context
+            utils.wait_for_pvc_deleted(core_v1, pvc_name, namespace)
 
-            delete_pod(core_v1, pod_name, namespace)
-            wait_for_pod_deleted(core_v1, pod_name, namespace)
-
-            delete_pvc(core_v1, pvc_name, namespace)
-
-            wait_for_pvc_deleted(core_v1, pvc_name, namespace)
-
-            wait_for_pv_deleted(core_v1, pv_name, timeout=PVC_WAIT_TIMEOUT)
+            # Verify PV is deleted
+            utils.wait_for_pv_deleted(core_v1, pv_name, timeout=utils.PVC_WAIT_TIMEOUT)
 
             logger.info("Successfully verified: PV '%s' was deleted after PVC deletion", pv_name)
-
-        finally:
-            try:
-                delete_pod(core_v1, pod_name, namespace)
-            except Exception:
-                pass
-            try:
-                delete_pvc(core_v1, pvc_name, namespace)
-            except Exception:
-                pass
-            try:
-                delete_storage_class(storage_api, sc_name)
-            except Exception:
-                pass
 
     def test_volume_retain_policy(self, kubeconfig: Path):
         """Test that PV is retained when PVC is deleted with 'Retain' reclaim policy."""
@@ -290,51 +263,49 @@ class TestVolumeLifecycle:
         sc_name = "test-retain-policy-sc"
         pvc_name = "test-retain-policy-pvc"
         pod_name = "test-retain-policy-pod"
-        namespace = "default"
+        namespace = DEFAULT_NAMESPACE
         pv_name = None
 
-        try:
-            create_storage_class(
-                storage_api,
-                name=sc_name,
-                provisioner=self.csi_provisioner,
-                reclaim_policy="Retain",
-            )
-
-            create_pvc(
+        with utils.managed_storage_class(
+            storage_api,
+            name=sc_name,
+            provisioner=self.csi_provisioner,
+            reclaim_policy="Retain",
+        ):
+            with utils.managed_pvc(
                 core_v1,
                 name=pvc_name,
                 namespace=namespace,
                 storage_class=sc_name,
                 size="1Gi",
-            )
+            ):
+                with utils.managed_pod(
+                    core_v1,
+                    pod_name=pod_name,
+                    pvc_name=pvc_name,
+                    namespace=namespace,
+                    node_selector={"storagePool": "primary"},
+                ):
+                    utils.wait_for_pvc_bound(
+                        core_v1, pvc_name, namespace, timeout=utils.PVC_WAIT_TIMEOUT
+                    )
 
-            create_pod_with_pvc(
-                core_v1,
-                pod_name=pod_name,
-                pvc_name=pvc_name,
-                namespace=namespace,
-                node_selector={"storagePool": "primary"},
-            )
+                    pv_name = utils.get_pv_for_pvc(core_v1, pvc_name, namespace)
+                    assert pv_name is not None, f"PVC '{pvc_name}' is not bound to any PV"
 
-            wait_for_pvc_bound(core_v1, pvc_name, namespace, timeout=PVC_WAIT_TIMEOUT)
+                    reclaim_policy = utils.get_pv_reclaim_policy(core_v1, pv_name)
+                    assert reclaim_policy == "Retain", (
+                        f"Expected reclaim policy 'Retain' but got '{reclaim_policy}'"
+                    )
 
-            pv_name = get_pv_for_pvc(core_v1, pvc_name, namespace)
-            assert pv_name is not None, f"PVC '{pvc_name}' is not bound to any PV"
+                # Pod is deleted when exiting managed_pod context
+                utils.wait_for_pod_deleted(core_v1, pod_name, namespace)
 
-            reclaim_policy = get_pv_reclaim_policy(core_v1, pv_name)
-            assert reclaim_policy == "Retain", (
-                f"Expected reclaim policy 'Retain' but got '{reclaim_policy}'"
-            )
+            # PVC is deleted when exiting managed_pvc context
+            utils.wait_for_pvc_deleted(core_v1, pvc_name, namespace)
 
-            delete_pod(core_v1, pod_name, namespace)
-            wait_for_pod_deleted(core_v1, pod_name, namespace)
-
-            delete_pvc(core_v1, pvc_name, namespace)
-
-            wait_for_pvc_deleted(core_v1, pvc_name, namespace)
-
-            assert pv_exists(core_v1, pv_name), (
+            # Verify PV is retained (not deleted)
+            assert utils.pv_exists(core_v1, pv_name), (
                 f"PV '{pv_name}' was deleted but should have been retained"
             )
 
@@ -349,22 +320,6 @@ class TestVolumeLifecycle:
                 pv.status.phase,
             )
 
-        finally:
-            try:
-                delete_pod(core_v1, pod_name, namespace)
-            except Exception:
-                pass
-            try:
-                delete_pvc(core_v1, pvc_name, namespace)
-            except Exception:
-                pass
-            if pv_name:
-                try:
-                    delete_pv(core_v1, pv_name)
-                    logger.info("Cleaned up retained PV '%s'", pv_name)
-                except Exception:
-                    pass
-            try:
-                delete_storage_class(storage_api, sc_name)
-            except Exception:
-                pass
+            # Clean up the retained PV using managed_pv context
+            with utils.managed_pv(core_v1, pv_name):
+                logger.info("Cleaning up retained PV '%s'", pv_name)

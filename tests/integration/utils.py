@@ -1,17 +1,17 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import functools
 import logging
 import pprint
 import shlex
 import time
 from contextlib import contextmanager
-from typing import Callable, Generator, List, Optional
+from typing import Generator, List, Optional
 
 import pytest
 from kubernetes import client, stream, watch
 from kubernetes.client.models import EventsV1EventList
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 log = logging.getLogger(__name__)
 
@@ -20,47 +20,6 @@ POD_WAIT_TIMEOUT = 300
 PVC_WAIT_TIMEOUT = 120
 RETRY_INTERVAL = 5
 MAX_RETRIES = 10
-
-
-def retry(
-    max_attempts: int = MAX_RETRIES,
-    delay: int = RETRY_INTERVAL,
-    exceptions: tuple = (Exception,),
-) -> Callable:
-    """Retry a function on failure.
-
-    Args:
-        max_attempts: Maximum number of retry attempts.
-        delay: Delay between retries in seconds.
-        exceptions: Tuple of exceptions to catch and retry on.
-
-    Returns:
-        Decorated function with retry logic.
-    """
-
-    def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            last_exception = None
-            for attempt in range(1, max_attempts + 1):
-                try:
-                    return func(*args, **kwargs)
-                except exceptions as e:
-                    last_exception = e
-                    log.warning(
-                        "Attempt %d/%d for %s failed: %s",
-                        attempt,
-                        max_attempts,
-                        func.__name__,
-                        e,
-                    )
-                    if attempt < max_attempts:
-                        time.sleep(delay)
-            raise last_exception
-
-        return wrapper
-
-    return decorator
 
 
 def wait_for_pvc_bound(
@@ -155,7 +114,7 @@ def wait_for_pod(
         )
 
 
-@retry(max_attempts=5, delay=2, exceptions=(Exception,))
+@retry(stop=stop_after_attempt(5), wait=wait_fixed(2), reraise=True)
 def read_file_from_pod(
     core_v1: client.CoreV1Api,
     pod_name: str,
@@ -240,6 +199,130 @@ def k8s_resource_cleanup(
             except client.ApiException as e:
                 if e.status != 404:
                     log.warning("Failed to delete %s '%s': %s", kind, name, e)
+
+
+@contextmanager
+def managed_storage_class(
+    storage_api: client.StorageV1Api,
+    name: str,
+    provisioner: str,
+    reclaim_policy: str = "Delete",
+    volume_binding_mode: str = "WaitForFirstConsumer",
+    parameters: Optional[dict] = None,
+) -> Generator[str, None, None]:
+    """Context manager for storage class creation and cleanup.
+
+    Args:
+        storage_api: Instance of StorageV1 kubernetes api.
+        name: Name of the storage class.
+        provisioner: CSI provisioner name.
+        reclaim_policy: Reclaim policy ('Delete' or 'Retain').
+        volume_binding_mode: Volume binding mode.
+        parameters: Optional storage class parameters.
+
+    Yields:
+        Name of the created storage class.
+    """
+    create_storage_class(
+        storage_api, name, provisioner, reclaim_policy, volume_binding_mode, parameters
+    )
+    try:
+        yield name
+    finally:
+        try:
+            delete_storage_class(storage_api, name)
+        except Exception as e:
+            log.warning("Failed to delete storage class '%s': %s", name, e)
+
+
+@contextmanager
+def managed_pvc(
+    core_api: client.CoreV1Api,
+    name: str,
+    namespace: str,
+    storage_class: str,
+    size: str = "1Gi",
+    access_modes: Optional[List[str]] = None,
+) -> Generator[str, None, None]:
+    """Context manager for PVC creation and cleanup.
+
+    Args:
+        core_api: Instance of CoreV1 kubernetes api.
+        name: Name of the PVC.
+        namespace: Namespace for the PVC.
+        storage_class: Storage class name.
+        size: Storage size (e.g., '1Gi').
+        access_modes: List of access modes. Defaults to ['ReadWriteOnce'].
+
+    Yields:
+        Name of the created PVC.
+    """
+    create_pvc(core_api, name, namespace, storage_class, size, access_modes)
+    try:
+        yield name
+    finally:
+        try:
+            delete_pvc(core_api, name, namespace)
+        except Exception as e:
+            log.warning("Failed to delete PVC '%s': %s", name, e)
+
+
+@contextmanager
+def managed_pod(
+    core_api: client.CoreV1Api,
+    pod_name: str,
+    pvc_name: str,
+    namespace: str,
+    node_selector: Optional[dict] = None,
+    command: Optional[List[str]] = None,
+) -> Generator[str, None, None]:
+    """Context manager for pod creation and cleanup.
+
+    Args:
+        core_api: Instance of CoreV1 kubernetes api.
+        pod_name: Name of the pod.
+        pvc_name: Name of the PVC to mount.
+        namespace: Namespace for the pod.
+        node_selector: Optional node selector dict.
+        command: Optional command to run. Defaults to sleep.
+
+    Yields:
+        Name of the created pod.
+    """
+    create_pod_with_pvc(core_api, pod_name, pvc_name, namespace, node_selector, command)
+    try:
+        yield pod_name
+    finally:
+        try:
+            delete_pod(core_api, pod_name, namespace)
+        except Exception as e:
+            log.warning("Failed to delete pod '%s': %s", pod_name, e)
+
+
+@contextmanager
+def managed_pv(
+    core_api: client.CoreV1Api,
+    pv_name: str,
+) -> Generator[str, None, None]:
+    """Context manager for PV cleanup.
+
+    This context manager doesn't create a PV (they are created by provisioners),
+    but ensures cleanup of the PV after use.
+
+    Args:
+        core_api: Instance of CoreV1 kubernetes api.
+        pv_name: Name of the PV to manage.
+
+    Yields:
+        Name of the PV.
+    """
+    try:
+        yield pv_name
+    finally:
+        try:
+            delete_pv(core_api, pv_name)
+        except Exception as e:
+            log.warning("Failed to delete PV '%s': %s", pv_name, e)
 
 
 def verify_storage_class_exists(
