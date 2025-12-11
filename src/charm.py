@@ -181,9 +181,14 @@ class RawfileLocalPVOperatorCharm(ops.CharmBase):
             event.set_results({"result": msg})
 
     def _update_status(self, _):
-        if unready := self.collector.unready:
-            self.unit.status = ops.WaitingStatus(", ".join(unready))
-            raise status.ReconcilerError("Waiting for deployment")
+        try:
+            if unready := self.collector.unready:
+                self.unit.status = ops.WaitingStatus(", ".join(unready))
+                raise status.ReconcilerError("Waiting for deployment")
+        except ConfigError:
+            msg = "Waiting for Kubeconfig"
+            status.add(ops.WaitingStatus(msg))
+            raise status.ReconcilerError(msg)
         self.unit.status = ops.ActiveStatus("Ready")
         self.unit.set_workload_version(self.collector.short_version)
 
