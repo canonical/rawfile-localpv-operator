@@ -116,6 +116,7 @@ def kubernetes_cluster(juju: jubilant.Juju, request: pytest.FixtureRequest, arch
         constraints=constraints,
         base=base,
         config={"local-storage-enabled": False, "node-labels": "storagePool=primary"},
+        num_units=2,
     )
     juju.deploy(
         charm="k8s-worker",

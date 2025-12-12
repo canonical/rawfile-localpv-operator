@@ -233,9 +233,7 @@ class TestVolumeLifecycle:
                 node_selector={"storagePool": "primary"},
             ),
         ):
-            utils.wait_for_pvc_bound(
-                core_v1, pvc_name, namespace, timeout=utils.PVC_WAIT_TIMEOUT
-            )
+            utils.wait_for_pvc_bound(core_v1, pvc_name, namespace, timeout=utils.PVC_WAIT_TIMEOUT)
 
             pv_name = utils.get_pv_for_pvc(core_v1, pvc_name, namespace)
             assert pv_name is not None, f"PVC '{pvc_name}' is not bound to any PV"
@@ -290,9 +288,7 @@ class TestVolumeLifecycle:
                 node_selector={"storagePool": "primary"},
             ),
         ):
-            utils.wait_for_pvc_bound(
-                core_v1, pvc_name, namespace, timeout=utils.PVC_WAIT_TIMEOUT
-            )
+            utils.wait_for_pvc_bound(core_v1, pvc_name, namespace, timeout=utils.PVC_WAIT_TIMEOUT)
 
             pv_name = utils.get_pv_for_pvc(core_v1, pvc_name, namespace)
             assert pv_name is not None, f"PVC '{pvc_name}' is not bound to any PV"
