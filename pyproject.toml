@@ -77,3 +77,6 @@ skip = "build,lib,venv,icon.svg,.tox,.git,.mypy_cache,.ruff_cache,.coverage,upst
 
 [tool.pyright]
 include = ["src/**.py"]
+
+[tool.bandit]
+exclude_dirs = [".tox", ".venv", "venv"]
